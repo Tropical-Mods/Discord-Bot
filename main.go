@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	initSpinCycleCache()
 	err := runBot()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -22,7 +23,6 @@ func runBot() error {
 	if err != nil { return err }
 
 	token := strings.ReplaceAll(string(contents), "\n", "")
-	fmt.Println(token)
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil { return err }
 

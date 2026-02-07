@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -10,7 +11,37 @@ import (
 type SpinCycleInfo struct {
 	spin *discordgo.Channel
 	cycle *discordgo.Channel
+	guildID string
 	hasSpinCycle bool
+}
+
+var cache []SpinCycleInfo
+
+const cacheSize = 10
+func initSpinCycleCache() {
+	cache = make([]SpinCycleInfo, cacheSize)
+}
+
+func checkSpinCycleCache(guildID string) (SpinCycleInfo, bool) {
+	var info SpinCycleInfo
+	ok := false
+	for _, item := range cache {
+		if item.guildID == guildID { 
+			info = item 
+			ok = true
+			break
+		}
+	}
+
+	return info, ok
+}
+
+// not running a check here because this function should only be called in case of
+// a cache invalidation anyway
+func updateSpinCycleCache(info SpinCycleInfo) {
+	slices.Reverse(cache[:len(cache)-1])
+	slices.Reverse(cache)
+	cache[0] = info
 }
 
 func getSpinCycleInfo(s *discordgo.Session, guildID string) (SpinCycleInfo, error) {
@@ -29,6 +60,7 @@ func getSpinCycleInfo(s *discordgo.Session, guildID string) (SpinCycleInfo, erro
 		}
 	}
 
+	info.guildID = guildID
 	info.hasSpinCycle = true
 	if info.spin == nil || info.cycle == nil {
 		info.hasSpinCycle = false
@@ -38,8 +70,13 @@ func getSpinCycleInfo(s *discordgo.Session, guildID string) (SpinCycleInfo, erro
 }
 
 func updateSpinCycle(s *discordgo.Session, m *discordgo.VoiceStateUpdate) error {
-	info, err := getSpinCycleInfo(s, m.GuildID)
-	if err != nil { return err }
+	var info SpinCycleInfo
+	info, ok := checkSpinCycleCache(m.GuildID)
+	if !ok {
+		info, err := getSpinCycleInfo(s, m.GuildID)
+		if err != nil { return err }
+		updateSpinCycleCache(info)
+	}
 
 	if !info.hasSpinCycle { return nil }
 
